@@ -1,0 +1,66 @@
+import numpy as np
+def gini(y):
+    classes, counts = np.unique(y, return_counts=True)
+    probs = counts / counts.sum()
+    return 1 - np.sum(probs**2)
+
+
+def best_split(X, y):
+    m, n = X.shape
+    best_feature, best_thresh, best_gain = None, None, -1
+    base_impurity = gini(y)
+    
+    for feature in range(n):
+        thresholds = np.unique(X[:, feature])
+        for t in thresholds:
+            left_idx = X[:, feature] <= t
+            right_idx = ~left_idx
+            if left_idx.sum() == 0 or right_idx.sum() == 0:
+                continue
+            left_impurity = gini(y[left_idx])
+            right_impurity = gini(y[right_idx])
+            weighted_impurity = (left_idx.sum()/m)*left_impurity + (right_idx.sum()/m)*right_impurity
+            gain = base_impurity - weighted_impurity
+            if gain > best_gain:
+                best_gain = gain
+                best_feature, best_thresh = feature, t
+    return best_feature, best_thresh, best_gain
+
+
+class Node:
+    def __init__(self, feature=None, threshold=None, left=None, right=None, value=None):
+        self.feature = feature
+        self.threshold = threshold
+        self.left = left
+        self.right = right
+        self.value = value  
+
+def build_tree(X, y, depth=0, max_depth=5):
+    if len(set(y)) == 1:
+        return Node(value=y[0])
+    if depth >= max_depth:
+        values, counts = np.unique(y, return_counts=True)
+        return Node(value=values[np.argmax(counts)])
+    
+    feature, thresh, gain = best_split(X, y)
+    if gain == -1:  # tidak bisa split lagi
+        values, counts = np.unique(y, return_counts=True)
+        return Node(value=values[np.argmax(counts)])
+    
+    left_idx = X[:, feature] <= thresh
+    right_idx = ~left_idx
+    left_node = build_tree(X[left_idx], y[left_idx], depth+1, max_depth)
+    right_node = build_tree(X[right_idx], y[right_idx], depth+1, max_depth)
+    return Node(feature, thresh, left_node, right_node)
+
+
+def predict_one(x, node):
+    if node.value is not None:
+        return node.value
+    if x[node.feature] <= node.threshold:
+        return predict_one(x, node.left)
+    else:
+        return predict_one(x, node.right)
+
+def predict(X, tree):
+    return [predict_one(x, tree) for x in X]
